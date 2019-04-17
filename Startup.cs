@@ -1,7 +1,7 @@
+using System.Data;
+using System.Data.SqlClient;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SpaServices.AngularCli;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +23,7 @@ namespace DevOps
         {
             services.AddMvc()
                 .AddNewtonsoftJson();
+            services.AddTransient<IDbConnection>(sp => new SqlConnection(Configuration["ConnectionStrings:SQLServer"]));
 
             // In production, the Angular files will be served from this directory
             services.AddSpaStaticFiles(configuration =>
@@ -53,7 +54,7 @@ namespace DevOps
             {
                 routes.MapRoute(
                     name: "default",
-                    template: "{controller}/{action=Index}/{id?}");
+                    template: "api/{controller}/{action=Index}/{id?}");
             });
 
             app.UseSpa(spa =>
