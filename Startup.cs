@@ -6,11 +6,14 @@ using Microsoft.AspNetCore.SpaServices.AngularCli;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 
 namespace DevOps
 {
     public class Startup
     {
+        private const string ConnectionStringKey = "ConnectionStrings:SQLServer";
+
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -23,7 +26,13 @@ namespace DevOps
         {
             services.AddMvc()
                 .AddNewtonsoftJson();
-            services.AddTransient<IDbConnection>(sp => new SqlConnection(Configuration["ConnectionStrings:SQLServer"]));
+            services.AddTransient<IDbConnection>(sp => new SqlConnection(Configuration[ConnectionStringKey]));
+            Log.Logger = new LoggerConfiguration()
+                .WriteTo.MSSqlServer(
+                    connectionString: Configuration[ConnectionStringKey], 
+                    tableName: "Log", 
+                    autoCreateSqlTable: true)
+                .CreateLogger();
 
             // In production, the Angular files will be served from this directory
             services.AddSpaStaticFiles(configuration =>
