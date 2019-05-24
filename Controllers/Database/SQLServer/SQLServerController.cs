@@ -50,6 +50,15 @@ namespace DevOps.Controllers.Database.SQLServer
             }
         }
 
+        public async Task<IActionResult> Drop([Required]string dbToDrop)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            await this.db.ExecuteAsync($@"ALTER DATABASE [{dbToDrop}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE
+                                          DROP DATABASE [{dbToDrop}]");
+            return Ok();
+        }
+
         public async Task<IActionResult> Branch([Required]string dbFrom, [Required]string dbTo)
         {
             if (!ModelState.IsValid) return base.BadRequest(ModelState);
@@ -84,7 +93,7 @@ namespace DevOps.Controllers.Database.SQLServer
             });
 
             await this.db.ExecuteAsync($"EXEC master.dbo.xp_delete_file 0, @path", new { Path = backFile });
-            return Ok("Ok");
+            return Ok();
         }
 
         private static async Task<string> GetBackupDirectory(IDbConnection db)

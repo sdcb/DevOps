@@ -1,0 +1,50 @@
+<table mat-table [dataSource]="dbList">
+  <ng-container matColumnDef="id">
+    <th mat-header-cell *matHeaderCellDef>#</th>
+    <td mat-cell *matCellDef="let item">{{item.id}}</td>
+  </ng-container>
+  <ng-container matColumnDef="name">
+    <th mat-header-cell *matHeaderCellDef>Name</th>
+    <td mat-cell *matCellDef="let item">
+      <a matTooltip="Download Backup" [href]="'/api/sqlServer/backup?dbName=' + item.name">{{item.name}}</a>
+    </td>
+  </ng-container>
+  <ng-container matColumnDef="branch">
+    <th mat-header-cell *matHeaderCellDef>Branch</th>
+    <td mat-cell *matCellDef="let item">
+      <button mat-button (click)="openBranchDialog(item)">Branch</button>
+    </td>
+  </ng-container>
+  <ng-container matColumnDef="delete">
+    <th mat-header-cell *matHeaderCellDef>Delete</th>
+    <td mat-cell *matCellDef="let item">
+      <button mat-button color="warn" (click)="openDropDialog(item)">DROP</button>
+    </td>
+  </ng-container>
+  <tr mat-header-row *matHeaderRowDef="['id', 'name', 'branch', 'delete']"></tr>
+  <tr mat-row *matRowDef="let row; columns: ['id', 'name', 'branch', 'delete']"></tr>
+</table>
+
+<ng-template #branchDialog>
+  <h2 matDialogTitle>Branch [{{dbFrom}}]</h2>
+  <mat-form-field class="w100">
+    <input matInput placeholder="DB Name to be created/updated" [formControl]="dbTo">
+    <mat-error *ngIf="dbTo.hasError('required')">
+      Email is <strong>required</strong>
+    </mat-error>
+    <mat-error *ngIf="dbTo.hasError('same')">
+      dbTo should never be [{{dbFrom}}].
+    </mat-error>
+  </mat-form-field>
+  <mat-dialog-actions align="end">
+    <button mat-button color="primary" (click)="branch()">Create</button>
+  </mat-dialog-actions>
+</ng-template>
+
+<ng-template #dropDialog>
+  <h2 matDialogTitle>DROP DATABASE [{{dbToDrop}}]</h2>
+  <span>After drop, you WILL lost ALL data in [{{dbToDrop}}].</span>
+  <mat-dialog-actions align="end">
+    <button mat-raised-button color="warn" matTooltip="ARE YOU SURE?" (click)="delete()">I'm sure!</button>
+  </mat-dialog-actions>
+</ng-template>
