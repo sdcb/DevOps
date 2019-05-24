@@ -29,6 +29,7 @@ namespace DevOps
             services.AddTransient<IDbConnection>(sp => new SqlConnection(Configuration[ConnectionStringKey]));
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.MSSqlServer(
+                    restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information, 
                     connectionString: Configuration[ConnectionStringKey], 
                     tableName: "Log", 
                     autoCreateSqlTable: true)
