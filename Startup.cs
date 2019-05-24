@@ -24,8 +24,8 @@ namespace DevOps
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc()
-                .AddNewtonsoftJson();
+            services
+                .AddMvc(o => o.EnableEndpointRouting = false);
             services.AddTransient<IDbConnection>(sp => new SqlConnection(Configuration[ConnectionStringKey]));
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.MSSqlServer(

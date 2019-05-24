@@ -1,10 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dapper;
 using DevOps.Common;
+using DevOps.Controllers.Database.SQLServer.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DevOps.Controllers.Database.SQLServer
@@ -16,10 +21,10 @@ namespace DevOps.Controllers.Database.SQLServer
             this.db = db;
         }
 
-        public async Task<dynamic> DBList()
+        public async Task<IEnumerable<DatabaseDto>> DBList()
         {
-            return await this.db.QueryAsync(@"
-                SELECT name AS Name, database_id AS DatabaseId
+            return await this.db.QueryAsync<DatabaseDto>(@"
+                SELECT name AS Name, database_id AS Id
                 FROM master.sys.databases
                 where database_id > 4");
         }
@@ -45,16 +50,71 @@ namespace DevOps.Controllers.Database.SQLServer
             }
         }
 
+        public async Task<IActionResult> Branch([Required]string dbFrom, [Required]string dbTo)
+        {
+            if (!ModelState.IsValid) return base.BadRequest(ModelState);
+            if (dbFrom == dbTo) return base.BadRequest("新老数据库不能一样。");
+            
+            string backPath = await GetBackupDirectory(this.db);
+            string dataPath = await GetDataDirectory(this.db);
+            string backFile = Path.Combine(backPath, $"{dbFrom}_{DateTime.Now:yyyyMMdd_HHmm}.bak");
+
+            await this.db.ExecuteAsync("BACKUP DATABASE @dbName TO DISK=@location WITH INIT", new
+            {
+                DbName = dbFrom,
+                Location = backFile,
+            });
+
+            var files = this.db
+                .Query("RESTORE FILELISTONLY FROM  DISK = @backFile", new { BackFile = backFile })
+                .Select(x => new { Name = (string)x.LogicalName, Path = (string)x.PhysicalName });
+            string moves = string.Join(", ", files.Select(x =>
+            {
+                string newFileName = Regex.Replace(Path.GetFileName(x.Path), dbTo, dbTo, RegexOptions.IgnoreCase);
+                string dest = Path.Combine(dataPath, $"{newFileName}");
+                return $"\nMOVE N'{x.Name}' TO N'{dest}'";
+            }));
+
+            await this.db.ExecuteAsync(@$"IF DB_ID(@to) IS NULL CREATE DATABASE {dbTo}
+		                       ALTER DATABASE {dbFrom} SET SINGLE_USER WITH ROLLBACK IMMEDIATE
+		                       RESTORE DATABASE {dbFrom} FROM DISK=@location WITH {moves}, REPLACE", new
+            {
+                To = dbTo,
+                Location = backFile,
+            });
+
+            await this.db.ExecuteAsync($"EXEC master.dbo.xp_delete_file 0, @path", new { Path = backFile });
+            return Ok("Ok");
+        }
+
         private static async Task<string> GetBackupDirectory(IDbConnection db)
         {
-            dynamic value = await db.QueryFirstAsync(
-                @"EXEC master.dbo.xp_instance_regread @store, @location, @item", new
+            return
+                await db.QueryFirstAsync<string>("SELECT ServerProperty(@prop)", new
                 {
-                    Store = "HKEY_LOCAL_MACHINE", 
-                    Location = @"Software\Microsoft\MSSQLServer\MSSQLServer", 
-                    Item = "BackupDirectory"
-                });
-            return value.Data;
+                    Prop = "InstanceDefaultBackupPath"
+                }) ??
+                db.QueryFirstOrDefault(@"EXEC xp_instance_regread @store, @path, @key", new
+                {
+                    Store = "HKEY_LOCAL_MACHINE",
+                    Path = @"Software\Microsoft\MSSQLServer\MSSQLServer",
+                    Key = "BackupDirectory"
+                })?.Data;
+        }
+
+        private static async Task<string> GetDataDirectory(IDbConnection db)
+        {
+            return
+                await db.QueryFirstAsync<string>("SELECT ServerProperty(@prop)", new
+                {
+                    Prop = "InstanceDefaultDataPath"
+                }) ??
+                db.QueryFirstOrDefault(@"EXEC xp_instance_regread @store, @path, @key", new
+                {
+                    Store = "HKEY_LOCAL_MACHINE",
+                    Path = @"Software\Microsoft\MSSQLServer\MSSQLServer",
+                    Key = "DefaultData"
+                })?.Data;
         }
 
         private const string CategoryName = "SQLServer";
