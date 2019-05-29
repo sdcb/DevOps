@@ -38,7 +38,7 @@ namespace DevOps.Controllers.Database.SQLServer
                 {
                     DbName = dbName,
                     Location = backFile,
-                });
+                }, commandTimeout: 120);
 
                 var ms = new MemoryStream();
                 using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
