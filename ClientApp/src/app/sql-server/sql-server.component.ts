@@ -10,8 +10,8 @@ import { FormControl, Validators } from '@angular/forms';
 })
 export class SqlServerComponent implements OnInit {
   dbList: Array<DatabaseDto>;
-  @ViewChild('branchDialog') branchDialogView: TemplateRef<any>;
-  @ViewChild('dropDialog') deleteDialogView: TemplateRef<any>;
+  @ViewChild('branchDialog', { static: true }) branchDialogView: TemplateRef<any>;
+  @ViewChild('dropDialog', { static: true }) deleteDialogView: TemplateRef<any>;
 
   dbFrom: string;
   dbTo = new FormControl(null, [
