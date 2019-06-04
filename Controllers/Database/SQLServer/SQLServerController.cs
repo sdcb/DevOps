@@ -11,14 +11,18 @@ using Dapper;
 using DevOps.Common;
 using DevOps.Controllers.Database.SQLServer.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace DevOps.Controllers.Database.SQLServer
 {
     public class SQLServerController : Controller
     {
-        public SQLServerController(IDbConnection db)
+        public SQLServerController(
+            IDbConnection db, 
+            ILogger<SQLServerController> logger)
         {
             this.db = db;
+            this.logger = logger;
         }
 
         public async Task<IEnumerable<DatabaseDto>> DBList()
@@ -63,6 +67,7 @@ namespace DevOps.Controllers.Database.SQLServer
         {
             if (!ModelState.IsValid) return base.BadRequest(ModelState);
             if (dbFrom == dbTo) return base.BadRequest("新老数据库不能一样。");
+            this.logger.LogInformation("Backup {0} to {1}", dbFrom, dbTo);
             
             string backPath = await GetBackupDirectory(this.db);
             string dataPath = await GetDataDirectory(this.db);
@@ -84,9 +89,10 @@ namespace DevOps.Controllers.Database.SQLServer
                 return $"\nMOVE N'{x.Name}' TO N'{dest}'";
             }));
 
-            await this.db.ExecuteAsync(@$"IF DB_ID(@to) IS NULL CREATE DATABASE {dbTo}
-		                       ALTER DATABASE {dbFrom} SET SINGLE_USER WITH ROLLBACK IMMEDIATE
-		                       RESTORE DATABASE {dbFrom} FROM DISK=@location WITH {moves}, REPLACE", new
+            await this.db.ExecuteAsync(@$"
+                IF DB_ID(@to) IS NULL CREATE DATABASE {dbTo}
+                ALTER DATABASE {dbTo} SET SINGLE_USER WITH ROLLBACK IMMEDIATE
+                RESTORE DATABASE {dbTo} FROM DISK=@location WITH {moves}, REPLACE", new
             {
                 To = dbTo,
                 Location = backFile,
@@ -128,5 +134,6 @@ namespace DevOps.Controllers.Database.SQLServer
 
         private const string CategoryName = "SQLServer";
         private readonly IDbConnection db;
+        private readonly ILogger<SQLServerController> logger;
     }
 }
