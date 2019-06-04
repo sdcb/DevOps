@@ -35,6 +35,11 @@ export class SqlServerComponent implements OnInit {
     this.loadData();
   }
 
+  refresh() {
+    this.dbList = [];
+    this.loadData();
+  }
+
   openBranchDialog(item: DatabaseDto) {
     this.dbFrom = item.name;
     this.branchDialog = this.dialog.open(this.branchDialogView, { width: '500px' });

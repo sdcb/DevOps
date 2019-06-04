@@ -5,6 +5,7 @@ using System.Data;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dapper;
@@ -73,33 +74,39 @@ namespace DevOps.Controllers.Database.SQLServer
             string dataPath = await GetDataDirectory(this.db);
             string backFile = Path.Combine(backPath, $"{dbFrom}_{DateTime.Now:yyyyMMdd_HHmm}.bak");
 
-            await this.db.ExecuteAsync("BACKUP DATABASE @dbName TO DISK=@location WITH INIT", new
+            await this.db.ExecuteAsync(L("BACKUP DATABASE @dbName TO DISK=@location WITH INIT"), new
             {
                 DbName = dbFrom,
                 Location = backFile,
             });
 
             var files = this.db
-                .Query("RESTORE FILELISTONLY FROM  DISK = @backFile", new { BackFile = backFile })
+                .Query(L("RESTORE FILELISTONLY FROM DISK = @backFile"), new { BackFile = backFile })
                 .Select(x => new { Name = (string)x.LogicalName, Path = (string)x.PhysicalName });
             string moves = string.Join(", ", files.Select(x =>
             {
-                string newFileName = Regex.Replace(Path.GetFileName(x.Path), dbTo, dbTo, RegexOptions.IgnoreCase);
+                string newFileName = Regex.Replace(Path.GetFileName(x.Path), dbFrom, dbTo, RegexOptions.IgnoreCase);
                 string dest = Path.Combine(dataPath, $"{newFileName}");
                 return $"\nMOVE N'{x.Name}' TO N'{dest}'";
             }));
 
-            await this.db.ExecuteAsync(@$"
+            await this.db.ExecuteAsync(L(@$"
                 IF DB_ID(@to) IS NULL CREATE DATABASE {dbTo}
                 ALTER DATABASE {dbTo} SET SINGLE_USER WITH ROLLBACK IMMEDIATE
-                RESTORE DATABASE {dbTo} FROM DISK=@location WITH {moves}, REPLACE", new
+                RESTORE DATABASE {dbTo} FROM DISK=@location WITH {moves}, REPLACE"), new
             {
                 To = dbTo,
                 Location = backFile,
             });
 
-            await this.db.ExecuteAsync($"EXEC master.dbo.xp_delete_file 0, @path", new { Path = backFile });
+            await this.db.ExecuteAsync(L($"EXEC master.dbo.xp_delete_file 0, @path"), new { Path = backFile });
             return Ok();
+        }
+
+        private string L(string text, [CallerMemberName]string callerMember = null)
+        {
+            this.logger.LogInformation("SQL from {0}:\n{1}", callerMember, text);
+            return text;
         }
 
         private static async Task<string> GetBackupDirectory(IDbConnection db)
